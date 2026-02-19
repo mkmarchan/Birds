@@ -14,11 +14,12 @@ def main():
     frame_size_a = 1024
     hop_size_a = int(frame_size_a / 4)
     window_a = scipy.signal.windows.dpss(frame_size_a, 5 * np.pi)
-    sine_threshold_db_a = -65
+    sine_threshold_db_a = -60
     max_num_sines_a = 100
-    min_sine_dur_a = 0.01
-    freq_dev_offset_a = 200
-    min_freq_a = 700
+    min_sine_dur_a = 0.03
+    freq_dev_offset_a = 100
+    freq_dev_slope_a = 0.1
+    min_freq_a = 400
 
     file_path_b = '/Users/mkmarchan/Downloads/car_horn_crop.wav'
     data_b, sample_rate_b = sf.read(file_path_b)
@@ -41,7 +42,8 @@ def main():
         sine_threshold_db_a,
         max_num_sines_a,
         min_sine_dur_a,
-        freq_dev_offset_a
+        freq_dev_offset_a,
+        freq_dev_slope_a,
         )
     
     freqs_a[freqs_a < min_freq_a] = 0
@@ -69,24 +71,24 @@ def main():
 
     # Morph settings
     b_morph_frame = 6
-    morph_pct = np.minimum(1, np.arange(freqs_a.shape[0]) / (freqs_a.shape[0] / 2)) # np.ones(freqs_a.shape[0]) 
+    morph_pct = np.minimum(1, np.arange(freqs_a.shape[0]) / (freqs_a.shape[0] / 1.2)) # np.ones(freqs_a.shape[0]) 
 
     a_tracks = SineTrack.extract_tracks(freqs_a, mags_a)
     b_tracks = SineTrack.extract_tracks(freqs_b, mags_b)
 
-    # Plot a_tracks
-    for track in a_tracks:
-        frames = np.arange(track.start_frame, track.end_frame)
-        plt.plot(frames, track.freqs)
+    # # Plot a_tracks
+    # for track in a_tracks:
+    #     frames = np.arange(track.start_frame, track.end_frame)
+    #     plt.plot(frames, track.freqs)
 
-    plt.show()
+    # plt.show()
 
-    # Plot b_tracks
-    for track in b_tracks:
-        frames = np.arange(track.start_frame, track.end_frame)
-        plt.plot(frames, track.freqs)
+    # # Plot b_tracks
+    # for track in b_tracks:
+    #     frames = np.arange(track.start_frame, track.end_frame)
+    #     plt.plot(frames, track.freqs)
 
-    plt.show()
+    # plt.show()
 
     fundamental_idx_b = get_fundamental_idx(freqs_b[b_morph_frame], mags_b[b_morph_frame])
     freq_ratios_b = freqs_b[b_morph_frame] / freqs_b[b_morph_frame, fundamental_idx_b]
@@ -120,7 +122,7 @@ def main():
         # to sum to 1. This is likely impossible, so just approximate it by iteratively
         # normalizing
         normalized_freq_weights = freq_weights
-        for iteration in range(10):
+        for iteration in range(100):
             # Sum the weights for a given a idx
             freq_weight_a_sums = np.sum(normalized_freq_weights, axis = -1, keepdims = True)
             # Avoid division by 0
@@ -145,10 +147,10 @@ def main():
 
             freqs_int[frame_idx, start_freq_idx:end_freq_idx] = 2 ** (np.log2(freqs_a[frame_idx, freq_idx_a]) * (1 - morph_pct[frame_idx]) + np.log2(freqs_b[b_morph_frame]) * morph_pct[frame_idx]) # freqs_b[b_morph_frame]
             freqs_int[frame_idx, start_freq_idx:end_freq_idx][freqs_b[b_morph_frame] == 0] = 0
-            mags_int[frame_idx, start_freq_idx:end_freq_idx] = 20 * np.log10(amps_a[frame_idx, freq_idx_a] * normalized_freq_weights[freq_idx_a])# mags_a[frame_idx, freq_idx_a] * (1 - morph_pct[frame_idx]) + mags_b[b_morph_frame] * morph_pct[frame_idx] + 20 * np.log10(normalized_freq_weights[freq_idx_a]) # 20 * np.log10(amps_b[b_morph_frame] * np.sum(amps_a[frame_idx] ** 2) / np.sum(amps_b[b_morph_frame] ** 2))
+            mags_int[frame_idx, start_freq_idx:end_freq_idx] = mags_a[frame_idx, freq_idx_a] * (1 - morph_pct[frame_idx]) + mags_b[b_morph_frame] * morph_pct[frame_idx] + 20 * np.log10(normalized_freq_weights[freq_idx_a]) # 20 * np.log10(amps_a[frame_idx, freq_idx_a] * normalized_freq_weights[freq_idx_a]) # 20 * np.log10(amps_b[b_morph_frame] * np.sum(amps_a[frame_idx] ** 2) / np.sum(amps_b[b_morph_frame] ** 2))
             mags_int[frame_idx, start_freq_idx:end_freq_idx][freqs_b[b_morph_frame] == 0] = 0
         
-    # mags_a[freqs_a < 2000] = -200
+    # output = sm.sineModelSynth(freqs_a, mags_a, np.array([]), frame_size_a, hop_size_a, sample_rate_a)
     output = sm.sineModelSynth(freqs_int, mags_int, np.array([]), frame_size_a, hop_size_a, sample_rate_a)
 
     sf.write("test.wav", output, sample_rate_a)
