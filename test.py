@@ -165,39 +165,5 @@ def main():
 
     sf.write("test.wav", output, sample_rate_a)
 
-class SineTrack():
-    def __init__(self, start_frame, end_frame, freqs, mags):
-        self.start_frame = start_frame
-        self.end_frame = end_frame
-        self.freqs = freqs
-        self.mags = mags
-
-def extract_tracks(freqs, mags):
-    tracks = list()
-    for freq_index in range(freqs.shape[1]):
-        start_frame = 0
-        track_freqs = list()
-        track_mags = list()
-        cur_freq = 0
-        for frame in range(freqs.shape[0]):
-            if freqs[frame, freq_index] != 0:
-                if cur_freq == 0:
-                    track_freqs = list()
-                    track_mags = list()
-                    start_frame = frame
-
-                cur_freq = freqs[frame, freq_index]
-                track_freqs.append(cur_freq)
-                track_mags.append(mags[frame, freq_index])
-            else:
-                if cur_freq != 0:
-                    tracks.append(SineTrack(start_frame, frame, track_freqs, track_mags))
-                    cur_freq = 0
-
-    return tracks
-
-
-
-
 if __name__ == '__main__':
     main()
